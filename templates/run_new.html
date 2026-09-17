@@ -13,14 +13,14 @@
       <fieldset>
         <legend>Access mode</legend>
         <label class="radio-option">
-          <input type="radio" name="mode" value="public_profile" checked onchange="document.getElementById('ack-fields').hidden = true">
+          <input type="radio" name="mode" value="public_profile" checked>
           <span>
             <strong>Public Profile</strong>
             <span class="desc">Conservative, high-level information only. No acknowledgement required. Informational only — does not establish permission for testing.</span>
           </span>
         </label>
         <label class="radio-option">
-          <input type="radio" name="mode" value="authorized_passive" onchange="document.getElementById('ack-fields').hidden = false">
+          <input type="radio" name="mode" value="authorized_passive">
           <span>
             <strong>Authorized Passive Recon</strong>
             <span class="desc">Fuller passive results across all categories. Requires an authorization acknowledgement, which is recorded in the audit log.</span>
@@ -28,11 +28,11 @@
         </label>
       </fieldset>
 
-      <div id="ack-fields" hidden>
+      <div id="ack-fields">
         <div class="field">
-          <label for="purpose">Authorization &amp; purpose</label>
+          <label for="purpose">Authorization &amp; purpose <span class="field-hint">(required for Authorized Passive Recon)</span></label>
           <textarea id="purpose" name="purpose" placeholder="Describe your authorization to assess this organization and the purpose of this run (e.g. engagement reference, client authorization)."></textarea>
-          <p class="field-hint">This is a product control, not legal advice or a substitute for contractual permission. It is recorded with your account, the target, and the time.</p>
+          <p class="field-hint">Public Profile does not require this field. For Authorized Passive Recon, enter at least 10 characters. This is a product control, not legal advice or a substitute for contractual permission. It is recorded with your account, the target, and the time.</p>
         </div>
       </div>
 

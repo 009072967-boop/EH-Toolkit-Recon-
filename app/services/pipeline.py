@@ -13,6 +13,7 @@ from app.services.recon.crtsh_adapter import CrtShAdapter
 from app.services.recon.dns_adapter import DnsAdapter
 from app.services.recon.documents_adapter import PublicDocumentsAdapter
 from app.services.recon.domain_context_adapter import DomainContextAdapter
+from app.services.recon.leadership_adapter import LeadershipAdapter
 from app.services.recon.people_adapter import PeopleAdapter
 from app.services.recon.rdap_adapter import RdapAdapter
 from app.services.recon.tech_signals_adapter import TechSignalsAdapter
@@ -31,6 +32,7 @@ ADAPTERS: list[ReconAdapter] = [
     RdapAdapter(),
     CrtShAdapter(),
     PeopleAdapter(),
+    LeadershipAdapter(),
     PublicDocumentsAdapter(),
 ]
 
@@ -75,7 +77,12 @@ async def execute_run(run_id: str) -> None:
                             organization_name=organization.name,
                             timeout=settings.adapter_timeout_seconds,
                         ),
-                        timeout=settings.adapter_timeout_seconds + 2,
+                        # Each adapter declares how many sequential request-timeout-sized
+                        # stages it can chain (robots.txt, homepage discovery, candidate pages,
+                        # a bounded second hop, ...) so a slow/hanging simple adapter is still
+                        # cut off quickly instead of every adapter getting the same generous
+                        # budget regardless of how much work it actually does.
+                        timeout=settings.adapter_timeout_seconds * adapter.timeout_budget_multiplier + 4,
                     )
                     return adapter.name, findings, None
                 except (AdapterError, TimeoutError, asyncio.TimeoutError) as exc:
