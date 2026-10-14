@@ -210,7 +210,12 @@ def reset_confirm_submit(
         .filter(PasswordResetToken.token_hash == token_hash, PasswordResetToken.used_at.is_(None))
         .one_or_none()
     )
-    if not record or record.expires_at < datetime.now(timezone.utc):
+    # SQLite drops tzinfo on read, so a stored UTC expiry comes back naive; comparing it to an
+    # aware "now" raised TypeError and 500'd every reset attempt. It was written as UTC, so mark it so.
+    expires_at = record.expires_at if record else None
+    if expires_at is not None and expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    if not record or expires_at < datetime.now(timezone.utc):
         return _redirect_with_flash("/auth/reset", "That reset link is invalid or has expired.")
 
     user = db.get(User, record.user_id)

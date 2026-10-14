@@ -29,6 +29,23 @@
       <div class="notice-banner">Incomplete source coverage: {{ failed_sources | join(", ") }} could not be reached this run.</div>
     {% endif %}
 
+    {% if background %}
+    <div class="card">
+      <h2>Company background</h2>
+      {% for r in background %}
+        <div class="result-card">
+          <strong>{{ r.title }}</strong>
+          {% if r.summary %}<p style="white-space:pre-line;">{{ r.summary }}</p>{% endif %}
+          <div class="meta">
+            <span>Source: {% if r.source_url %}<a href="{{ r.source_url }}" target="_blank" rel="noopener noreferrer">{{ r.source_name }}</a>{% else %}{{ r.source_name }}{% endif %}</span>
+            <span>{{ (r.confidence * 100) | round | int }}% confidence</span>
+            {% if r.rationale %}<span>{{ r.rationale }}</span>{% endif %}
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
     <div class="summary-grid">
       {% for cat, label in category_labels.items() %}
       <a class="summary-tile" href="/runs/{{ run.id }}/category/{{ cat.value }}" style="text-decoration:none; color:inherit; display:block;">

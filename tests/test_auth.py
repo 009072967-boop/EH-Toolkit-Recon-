@@ -78,3 +78,33 @@ def test_unauthenticated_landing_redirects_to_login(client):
     response = client.get("/", follow_redirects=False)
     assert response.status_code == 303
     assert response.headers["location"] == "/auth/login"
+
+
+def test_password_reset_flow_sets_new_password(client, db_session):
+    import re
+
+    from app.models import User
+    from app.security import verify_password
+
+    csrf = _get_csrf(client)
+    client.post(
+        "/auth/register",
+        data={"email": "resetme@example.com", "password": "correct-horse-battery",
+              "confirm_password": "correct-horse-battery", "csrf_token": csrf},
+        follow_redirects=False,
+    )
+    csrf = _get_csrf(client, "/auth/reset")
+    page = client.post("/auth/reset", data={"email": "resetme@example.com", "csrf_token": csrf})
+    link = re.search(r"/auth/reset/confirm/[\w-]+", page.text).group(0)
+
+    response = client.post(
+        link,
+        data={"password": "brand-new-password-1", "confirm_password": "brand-new-password-1", "csrf_token": csrf},
+        follow_redirects=False,
+    )
+
+    # Regression: SQLite returns the stored expiry without tzinfo, which used to raise a TypeError (HTTP 500).
+    assert response.status_code == 303
+    assert "Password+updated" in response.headers["location"] or "Password%20updated" in response.headers["location"]
+    user = db_session.query(User).filter(User.email == "resetme@example.com").one()
+    assert verify_password("brand-new-password-1", user.password_hash)

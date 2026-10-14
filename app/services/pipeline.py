@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from app.audit import record_event
 from app.config import get_settings
 from app.database import SessionLocal
-from app.models import ReconResult, ReconRun, ResultObservation, RunStatus
+from app.models import AccessMode, ReconResult, ReconRun, ResultCategory, ResultObservation, RunStatus
 from app.services.recon.base import AdapterError, ReconAdapter
 from app.services.recon.crtsh_adapter import CrtShAdapter
 from app.services.recon.dns_adapter import DnsAdapter
@@ -16,9 +16,11 @@ from app.services.recon.domain_context_adapter import DomainContextAdapter
 from app.services.recon.leadership_adapter import LeadershipAdapter
 from app.services.recon.people_adapter import PeopleAdapter
 from app.services.recon.rdap_adapter import RdapAdapter
+from app.services.recon.sec_edgar_adapter import SecEdgarAdapter
 from app.services.recon.tech_signals_adapter import TechSignalsAdapter
 from app.services.recon.web_adapter import WebPresenceAdapter
 from app.services.recon.wiki_adapter import WikipediaOverviewAdapter
+from app.services.recon.wikidata_adapter import WikidataProfileAdapter
 
 logger = logging.getLogger("ethicalhawk.pipeline")
 settings = get_settings()
@@ -27,14 +29,24 @@ ADAPTERS: list[ReconAdapter] = [
     DomainContextAdapter(),
     WebPresenceAdapter(),
     WikipediaOverviewAdapter(),
+    WikidataProfileAdapter(),
     TechSignalsAdapter(),
     DnsAdapter(),
     RdapAdapter(),
     CrtShAdapter(),
     PeopleAdapter(),
     LeadershipAdapter(),
+    SecEdgarAdapter(),
     PublicDocumentsAdapter(),
 ]
+
+# Defense in depth for PROGRAM_REQUIREMENTS.md 6.1: whatever an adapter returns, a Public Profile
+# run only ever stores high-level organizational categories. Adapters shared between modes (e.g.
+# Wikidata, which also yields people) can't leak fuller-recon categories into a conservative run.
+MODE_CATEGORIES: dict[AccessMode, frozenset[ResultCategory]] = {
+    AccessMode.PUBLIC_PROFILE: frozenset({ResultCategory.WEB_PRESENCE, ResultCategory.DOMAINS}),
+    AccessMode.AUTHORIZED_PASSIVE: frozenset(ResultCategory),
+}
 
 
 async def execute_run(run_id: str) -> None:
@@ -96,6 +108,7 @@ async def execute_run(run_id: str) -> None:
         else:
             results = []
 
+        allowed_categories = MODE_CATEGORIES[run.mode]
         failed_sources: list[str] = []
         seen_keys: set[str] = set()
         for source_name, findings, error in results:
@@ -112,7 +125,7 @@ async def execute_run(run_id: str) -> None:
                 continue
 
             for finding in findings:
-                if finding.dedupe_key in seen_keys:
+                if finding.category not in allowed_categories or finding.dedupe_key in seen_keys:
                     continue
                 seen_keys.add(finding.dedupe_key)
 
@@ -140,7 +153,14 @@ async def execute_run(run_id: str) -> None:
         record_event(
             db,
             event_type="recon.run_completed",
-            description=f"Run {run_id} completed for {organization.name} ({run.mode.value}).",
+            # Per-source counts make a thin run diagnosable after the fact: a source that returned
+            # nothing is visible here even though it raised no error.
+            description=(
+                f"Run {run_id} completed for {organization.name} ({run.mode.value}). Results per source: "
+                + ", ".join(
+                    f"{name}={'failed' if error else len(findings)}" for name, findings, error in results
+                )
+            )[:1000],
             user_id=run.user_id,
             target_type="recon_run",
             target_id=run_id,

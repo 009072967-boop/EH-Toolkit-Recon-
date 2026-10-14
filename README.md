@@ -14,8 +14,10 @@ Real, keyless, ToS-friendly passive sources — no scraping of general-purpose s
 | RDAP (rdap.org) | DNS & Network Context | Structured domain registration data (WHOIS successor) |
 | Certificate Transparency (crt.sh) | Domains & Subdomains | Subdomains observed in public CT logs |
 | Wikipedia REST/opensearch APIs | Web Presence, People, search matching | Public summaries; best-effort leadership name extraction |
-| Organization's own homepage | Web Presence | Title/description/response headers — the same GET a browser makes, SSRF-guarded, robots.txt-respecting |
-| Organization's own conventional public paths | Public Documents | `/press`, `/investors`, `/security.txt`, etc. on the confirmed domain only |
+| Wikidata API | Web Presence (company background, subsidiaries, social accounts), People | Founding date, HQ, industry, employees, revenue, ownership, stock listing; founders/CEO/chair/board |
+| SEC EDGAR (US public companies) | Web Presence (registrant profile), Public Documents, People | 10-K/10-Q/proxy/8-K links; directors and officers from Form 3/4 insider filings. Needs `SEC_CONTACT_EMAIL` |
+| Organization's own homepage | Web Presence | Title/description/response headers, official social account links — the same GET a browser makes, SSRF-guarded, robots.txt-respecting |
+| Organization's own conventional public paths | Public Documents, People | `/press`, `/investors`, `/security.txt`, leadership/team pages (schema.org `Person` data + name/title text), etc. on the confirmed domain only |
 
 All outbound requests to target-controlled URLs go through `app/services/ssrf_guard.py`, which blocks private/loopback/link-local/reserved address space and re-validates every redirect hop.
 
@@ -25,7 +27,7 @@ All outbound requests to target-controlled URLs go through `app/services/ssrf_gu
 python -m venv .venv
 . .venv/Scripts/activate   # Windows Git Bash; use .venv\Scripts\Activate.ps1 in PowerShell
 pip install -r requirements.txt
-cp .env.example .env       # adjust SECRET_KEY for anything beyond local use
+cp .env.example .env       # adjust SECRET_KEY for anything beyond local use; set SEC_CONTACT_EMAIL to enable SEC EDGAR
 
 python -m app.seed         # optional: creates a demo account + demo org with mock data
 uvicorn app.main:app --reload

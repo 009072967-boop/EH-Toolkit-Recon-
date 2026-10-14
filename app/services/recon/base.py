@@ -61,6 +61,23 @@ async def fetch_robots_parser(domain: str, *, timeout: float) -> urllib.robotpar
     return parser
 
 
+# Statuses a site (or its CDN/WAF, e.g. Cloudflare) returns when it is refusing automated
+# requests rather than saying "this page doesn't exist".
+_BLOCKED_STATUSES = {401, 403, 429, 503}
+
+
+def raise_if_blocked(domain: str, statuses: list[int]) -> None:
+    """An adapter whose every page came back as a refusal must report that as a failure.
+    Returning an empty list instead makes a blocked scan indistinguishable from an organization
+    that genuinely publishes nothing -- the run would show empty categories with no warning."""
+    if not statuses or 200 in statuses:
+        return
+    blocked = sorted(s for s in set(statuses) if s in _BLOCKED_STATUSES)
+    if blocked:
+        codes = ", ".join(f"HTTP {s}" for s in blocked)
+        raise AdapterError(f"{domain} refused automated requests ({codes}); try again later")
+
+
 async def gather_limited(coros, *, limit: int = 5) -> list:
     """Runs coroutines concurrently but capped at `limit` in flight at once. Fetching every
     candidate/discovered URL fully in parallel can put 20-30+ simultaneous connections on a

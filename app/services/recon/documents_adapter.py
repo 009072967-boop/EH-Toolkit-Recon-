@@ -13,6 +13,7 @@ from app.services.recon.base import (
     fetch_robots_parser,
     gather_limited,
     path_allowed,
+    raise_if_blocked,
 )
 from app.services.ssrf_guard import UnsafeUrlError, safe_get
 
@@ -234,7 +235,7 @@ class PublicDocumentsAdapter(ReconAdapter):
         other_parsers = await asyncio.gather(
             *(fetch_robots_parser(host, timeout=timeout) for host in other_hosts)
         )
-        robots_by_host = {domain: domain_parser, **dict(zip(other_hosts, other_parsers))}
+        robots_by_host = {domain: domain_parser, **dict(zip(other_hosts, other_parsers, strict=False))}
 
         allowed = [
             (url, label)
@@ -258,7 +259,7 @@ class PublicDocumentsAdapter(ReconAdapter):
         # pages we already fetched, bounded so this can't spiral into a real crawl.
         second_hop: list[tuple[str, str]] = []
         seen_urls = {url for url, _ in allowed}
-        for (_url, _doc_type), response in zip(allowed, fetched):
+        for (_url, _doc_type), response in zip(allowed, fetched, strict=False):
             if response is None or response.status_code != 200:
                 continue
             for hop_url, hop_label in discover_same_domain_links(
@@ -274,7 +275,7 @@ class PublicDocumentsAdapter(ReconAdapter):
             hop_parsers = await asyncio.gather(
                 *(fetch_robots_parser(h, timeout=timeout) for h in hop_hosts)
             )
-            robots_by_host.update(zip(hop_hosts, hop_parsers))
+            robots_by_host.update(zip(hop_hosts, hop_parsers, strict=False))
             hop_allowed = [
                 (u, label) for u, label in second_hop
                 if path_allowed(robots_by_host.get(urlparse(u).hostname), urlparse(u).path or "/")
@@ -285,7 +286,7 @@ class PublicDocumentsAdapter(ReconAdapter):
         findings: list[AdapterFinding] = []
         reachable = False
 
-        for (url, doc_type), response in zip(allowed, fetched):
+        for (url, doc_type), response in zip(allowed, fetched, strict=False):
             if response is None:
                 continue
 
@@ -302,7 +303,9 @@ class PublicDocumentsAdapter(ReconAdapter):
                         source_name="Public Pages",
                         source_url=url,
                         confidence=0.9,
-                        rationale="Public page on the organization's own domain returned HTTP 200 without authentication.",
+                        rationale=(
+                            "Public page on the organization's own domain returned HTTP 200 without authentication."
+                        ),
                     )
                 )
                 if parsed.path.endswith("security.txt"):
@@ -312,6 +315,7 @@ class PublicDocumentsAdapter(ReconAdapter):
                     if doc_type in _PHONE_SCAN_LABELS and _looks_like_contact_page(url):
                         findings.extend(_customer_phone_numbers(domain, url, response.text[:250_000]))
 
+        raise_if_blocked(domain, [r.status_code for r in fetched if r is not None])
         if not reachable:
             raise AdapterError(f"Could not reach any known public paths on {domain}")
         return findings
