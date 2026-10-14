@@ -10,6 +10,42 @@ _TITLE_RE = re.compile(r"<title[^>]*>(.*?)</title>", re.IGNORECASE | re.DOTALL)
 _DESC_RE = re.compile(
     r'<meta[^>]+name=["\']description["\'][^>]+content=["\'](.*?)["\']', re.IGNORECASE | re.DOTALL
 )
+_HREF_RE = re.compile(r'href=["\'](https?://[^"\'\s<>]+)["\']', re.IGNORECASE)
+_SAME_AS_RE = re.compile(r'"sameAs"\s*:\s*(\[[^\]]*\]|"[^"]*")', re.IGNORECASE)
+_URL_IN_TEXT_RE = re.compile(r'https?://[^"\'\s,\]]+')
+
+# Official brand accounts linked from the organization's own homepage (header/footer icons, or
+# the schema.org "sameAs" list). Patterns are anchored to account-level URLs so share buttons
+# ("facebook.com/sharer...", "twitter.com/intent/...") and individual posts are not mistaken for
+# the organization's account. LinkedIn is limited to /company/ pages -- never personal /in/ profiles.
+_SOCIAL_PATTERNS = [
+    ("LinkedIn", re.compile(r"^https?://(?:[a-z]{2,3}\.)?linkedin\.com/company/([A-Za-z0-9_.%-]+)/?$", re.I)),
+    ("X (Twitter)", re.compile(r"^https?://(?:www\.)?(?:twitter|x)\.com/([A-Za-z0-9_]{1,15})/?$", re.I)),
+    ("Facebook", re.compile(r"^https?://(?:www\.)?facebook\.com/([A-Za-z0-9.\-]{2,})/?$", re.I)),
+    ("Instagram", re.compile(r"^https?://(?:www\.)?instagram\.com/([A-Za-z0-9_.]{2,30})/?$", re.I)),
+    ("YouTube", re.compile(r"^https?://(?:www\.)?youtube\.com/((?:@|c/|channel/|user/)[A-Za-z0-9_.\-]+)/?$", re.I)),
+    ("GitHub", re.compile(r"^https?://(?:www\.)?github\.com/([A-Za-z0-9-]{1,39})/?$", re.I)),
+    ("TikTok", re.compile(r"^https?://(?:www\.)?tiktok\.com/(@[A-Za-z0-9_.]{2,24})/?$", re.I)),
+]
+_RESERVED_HANDLES = {"share", "sharer", "intent", "home", "login", "signup", "hashtag", "search", "watch", "about"}
+
+
+def social_accounts(markup: str) -> list[tuple[str, str, str]]:
+    """(platform, handle, url) for each official account linked from a homepage."""
+    urls = [u for u in _HREF_RE.findall(markup)]
+    for block in _SAME_AS_RE.findall(markup):
+        urls.extend(_URL_IN_TEXT_RE.findall(block))
+    found: dict[tuple[str, str], tuple[str, str]] = {}
+    for raw in urls:
+        url = raw.split("?", 1)[0].split("#", 1)[0]
+        for platform, pattern in _SOCIAL_PATTERNS:
+            match = pattern.match(url)
+            if match:
+                handle = match.group(1)
+                if handle.lower().lstrip("@") not in _RESERVED_HANDLES:
+                    found.setdefault((platform, handle.lower()), (handle, url))
+                break
+    return [(platform, handle, url) for (platform, _key), (handle, url) in sorted(found.items())]
 
 
 class WebPresenceAdapter(ReconAdapter):
@@ -54,5 +90,21 @@ class WebPresenceAdapter(ReconAdapter):
                 rationale="Confirmed organization domain responded with a public homepage.",
             )
         ]
+
+        for platform, handle, social_url in social_accounts(html):
+            findings.append(
+                AdapterFinding(
+                    category=ResultCategory.WEB_PRESENCE,
+                    title=f"Official {platform} account: {handle}",
+                    summary=f"{platform} account linked from the organization's own homepage.",
+                    # Same key shape as the Wikidata adapter, so an account both sources report
+                    # is shown once rather than twice.
+                    dedupe_key=f"social:{platform.lower()}:{handle.lower()}",
+                    source_name="Official Website",
+                    source_url=social_url,
+                    confidence=0.9,
+                    rationale=f"Linked from https://{domain}/ (navigation/footer link or schema.org sameAs).",
+                )
+            )
 
         return findings

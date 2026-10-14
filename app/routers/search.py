@@ -1,4 +1,5 @@
-from urllib.parse import quote
+import re
+from urllib.parse import quote, urlparse
 
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import RedirectResponse
@@ -31,9 +32,32 @@ from app.services.matching import find_candidates
 router = APIRouter(tags=["search"])
 templates = Jinja2Templates(directory="templates")
 
+_DOMAIN_RE = re.compile(
+    r"^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$"
+)
+
 
 def _redirect_with_flash(url: str, message: str, kind: str = "error") -> RedirectResponse:
     return RedirectResponse(f"{url}?flash={quote(message)}&flash_type={kind}", status_code=303)
+
+
+def _normalize_domain(value: str) -> str | None:
+    """Accept a public hostname or URL, but never an IP address, path, or malformed target."""
+    candidate = value.strip().lower()
+    if not candidate:
+        return None
+    if "://" in candidate:
+        parsed = urlparse(candidate)
+        candidate = parsed.hostname or ""
+    else:
+        candidate = candidate.split("/", 1)[0].split(":", 1)[0]
+    candidate = candidate.rstrip(".")
+    # Users often paste a website URL such as https://www.example.org/. Store the
+    # registrable-looking hostname for CT, RDAP, and DNS context; those public
+    # sources describe example.org rather than its conventional www host.
+    if candidate.startswith("www."):
+        candidate = candidate[4:]
+    return candidate if _DOMAIN_RE.fullmatch(candidate) else None
 
 
 @router.get("/")
@@ -126,9 +150,13 @@ def confirm_organization(
         return _redirect_with_flash("/", "Your form session expired. Please try again.")
 
     name = name.strip()[:255]
-    domain = domain.strip().lower()[:255] or None
+    domain = _normalize_domain(domain[:255])
     if not name:
         return _redirect_with_flash("/", "Choose a valid organization to confirm.")
+    if domain is None:
+        return _redirect_with_flash(
+            "/", "Enter the organization's public domain before starting a research run."
+        )
 
     org = (
         db.query(Organization)
@@ -144,7 +172,6 @@ def confirm_organization(
         db.query(OrganizationMatch)
         .filter(
             OrganizationMatch.matched_name == name,
-            OrganizationMatch.matched_domain == domain,
             OrganizationMatch.searched_by_user_id == user.id,
             OrganizationMatch.confirmed.is_(False),
         )

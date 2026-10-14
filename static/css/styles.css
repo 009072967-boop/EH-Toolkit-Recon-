@@ -186,6 +186,7 @@ th { color: var(--muted); font-weight: 600; font-size: 0.8rem; text-transform: u
 
 .candidate-card { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; padding: 16px; border: 1px solid var(--border); border-radius: 10px; margin-bottom: 10px; background: var(--white); }
 .candidate-card .domain { color: var(--muted); font-size: 0.85rem; }
+.candidate-domain-input { margin: 0 0 8px; min-width: 160px; }
 
 .diff-added { border-left: 4px solid var(--success); }
 .diff-removed { border-left: 4px solid var(--error); }

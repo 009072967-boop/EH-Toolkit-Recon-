@@ -20,6 +20,10 @@ class Settings(BaseSettings):
     runs_per_user_per_hour: int = 5
     recon_kill_switch: bool = False
 
+    # SEC EDGAR's fair-access policy requires automated clients to identify themselves with a
+    # contact email in the User-Agent. The SEC adapter reports itself as not configured until set.
+    sec_contact_email: str = ""
+
     @property
     def is_production(self) -> bool:
         return self.environment.lower() == "production"

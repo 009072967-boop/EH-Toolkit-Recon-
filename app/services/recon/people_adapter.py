@@ -14,6 +14,13 @@ _ROLE_PATTERNS = [
     (re.compile(r"founded by ([A-Z][\w.\-]+(?: [A-Z][\w.\-]+){0,3})"), "Founder"),
     (re.compile(r"[Cc]hief [Ee]xecutive [Oo]fficer,? ([A-Z][\w.\-]+(?: [A-Z][\w.\-]+){0,3})"), "CEO"),
     (re.compile(r"([A-Z][\w.\-]+(?: [A-Z][\w.\-]+){0,3}),? (?:is|serves as) (?:the )?CEO"), "CEO"),
+    (
+        re.compile(
+            r"([A-Z][\w.\-]+(?: [A-Z][\w.\-]+){0,3})\s+(?:is|serves as)\s+(?:the )?"
+            r"(?:president and )?(?:CEO|[Cc]hief [Ee]xecutive [Oo]fficer)"
+        ),
+        "CEO",
+    ),
 ]
 
 

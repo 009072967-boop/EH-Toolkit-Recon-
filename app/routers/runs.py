@@ -16,6 +16,10 @@ from app.services.diff import diff_runs
 router = APIRouter(tags=["runs"])
 templates = Jinja2Templates(directory="templates")
 
+# Dedupe-key prefixes of findings that describe the organization itself (encyclopedia summary,
+# structured company profile, SEC registrant profile) -- surfaced as the Overview's summary.
+BACKGROUND_KEY_PREFIXES = ("wiki-summary:", "company-profile:")
+
 CATEGORY_LABELS = {
     ResultCategory.DOMAINS: "Domains & Subdomains",
     ResultCategory.WEB_PRESENCE: "Web Presence",
@@ -85,6 +89,7 @@ def run_dashboard(run_id: str, request: Request, user: User = Depends(require_us
             "organization": run.organization,
             "counts": counts,
             "category_labels": CATEGORY_LABELS,
+            "background": [r for r in visible_results if r.dedupe_key.startswith(BACKGROUND_KEY_PREFIXES)],
             "recent_results": sorted(visible_results, key=lambda r: r.discovered_at, reverse=True)[:8],
             "changes_preview": changes_preview,
             "has_previous_run": previous is not None,
@@ -99,7 +104,13 @@ def run_dashboard(run_id: str, request: Request, user: User = Depends(require_us
 @router.get("/runs/{run_id}/status")
 def run_status(run_id: str, request: Request, user: User = Depends(require_user), db: Session = Depends(get_db)):
     run = _get_owned_run(db, run_id, user)
-    return templates.TemplateResponse(request, "partials/run_status.html", {"run": run})
+    response = templates.TemplateResponse(request, "partials/run_status.html", {"run": run})
+    # The badge polls while a run is pending/running, but only the badge is swapped in. Once the
+    # run finishes, tell HTMX to reload the whole page so the result counts, background card and
+    # recent results appear -- otherwise the page keeps showing "Collecting..." until a manual reload.
+    if request.headers.get("HX-Request") and run.status in (RunStatus.COMPLETED, RunStatus.FAILED):
+        response.headers["HX-Refresh"] = "true"
+    return response
 
 
 @router.get("/runs/{run_id}/category/{category}")

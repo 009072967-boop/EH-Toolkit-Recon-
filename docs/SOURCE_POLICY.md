@@ -11,16 +11,28 @@ EthicalHawk Recon only collects information through the sources below. Every ada
 | RDAP (`rdap.org`) | Single HTTPS GET per run | Bootstraps to the correct registry; no auth |
 | Certificate Transparency (`crt.sh`) | Single HTTPS GET per run | Public CT log search, standard passive-recon technique |
 | Wikipedia REST summary + opensearch APIs | HTTPS GET, official MediaWiki API endpoints | Built for programmatic access; no key required |
-| The confirmed organization's own domain | HTTPS GET to `/` and a small fixed list of conventional paths (`/press`, `/investors`, `/security.txt`, ...) | robots.txt is checked before every fetch; SSRF-guarded; capped response size |
+| Wikidata (`wikidata.org` API) | `wbgetentities` via the official MediaWiki API, item resolved from the confirmed Wikipedia article | 2-4 GETs per run; structured company background, official social accounts, founders/CEO/chair/board |
+| SEC EDGAR (`data.sec.gov`, `sec.gov/Archives`) | Official submissions JSON + raw Form 3/4 XML, only for SEC registrants (CIK taken from Wikidata) | 1 + at most 25 GETs per run, 3 concurrent, identified User-Agent with `SEC_CONTACT_EMAIL` per SEC fair-access policy |
+| The confirmed organization's own domain | HTTPS GET to `/`, a small fixed list of conventional paths (`/press`, `/leadership`, `/security.txt`, ...), and same-domain links from those pages whose path/text match about/team/leadership-style keywords (one bounded extra hop) | robots.txt is checked before every fetch; SSRF-guarded; capped response size; never leaves the confirmed domain/subdomains |
 
 ## What is explicitly not done
 
 - No scraping of general-purpose search engines (Google, Bing, etc.) — those results would be
   outside the source's own API terms for automated collection.
-- No crawling beyond the fixed path list above — no following of arbitrary links.
-- No professional-network (e.g. LinkedIn) scraping for the People & Organization category. That
-  category is populated only from name/title mentions Wikipedia's own editors have already
-  publicly attributed, and is explicitly low-confidence and asks the analyst to verify independently.
+- No open-ended crawling — link following is limited to keyword-matched pages on the confirmed
+  domain, capped per label, with a single bounded second hop.
+- No professional-network (e.g. LinkedIn) scraping for the People & Organization category, and no
+  staff enumeration or email-address guessing. That category holds only professional names and
+  titles the organization or a public record already publishes: Wikidata role statements, SEC
+  Form 3/4 insider filings (directors/officers as filed), and the organization's own
+  leadership/team pages (schema.org `Person` markup or name/title text). Only name and title are
+  kept — Form 4 owner addresses and any `email`/`telephone` fields in page markup are never read.
+  Customer testimonials (`Review.author`) and product/case-study pages are excluded, since they
+  name people outside the organization.
+- Social accounts are organization brand accounts only: LinkedIn is limited to `/company/` pages,
+  and share/intent links are ignored.
+- Public Profile runs store only Web Presence and Domains results, enforced in the pipeline
+  (`MODE_CATEGORIES`) regardless of what a shared adapter returns.
 - No authentication, no bypassing of paywalls/access controls/rate limits.
 - No collection of personal contact details, credentials, or financial data.
 

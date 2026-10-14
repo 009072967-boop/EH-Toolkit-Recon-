@@ -23,7 +23,9 @@
         <form method="post" action="/organizations/confirm">
           <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
           <input type="hidden" name="name" value="{{ c.name }}">
-          <input type="hidden" name="domain" value="{{ c.domain or '' }}">
+          <label class="visually-hidden" for="domain-{{ loop.index }}">Confirmed public domain</label>
+          <input class="candidate-domain-input" id="domain-{{ loop.index }}" type="text" name="domain" value="{{ c.domain or '' }}" placeholder="example.org" required maxlength="253" autocomplete="url">
+          {% if not c.domain %}<p class="field-hint">No domain was confirmed automatically. Enter the organization's public domain to continue.</p>{% endif %}
           <button class="btn small" type="submit">This is the one</button>
         </form>
       </div>
