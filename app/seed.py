@@ -97,7 +97,83 @@ def _mock_results(run_id: str, variant: int) -> list[ReconResult]:
                 confidence=0.75,
             )
         )
+        base.extend(_mock_background_and_people(run_id))
     return base
+
+
+def _mock(run_id, category, title, summary, key, source, confidence, rationale=None, url=None) -> ReconResult:
+    return ReconResult(
+        run_id=run_id,
+        category=category,
+        title=title,
+        summary=summary,
+        dedupe_key=key,
+        source_name=source,
+        source_url=url,
+        confidence=confidence,
+        rationale=rationale,
+    )
+
+
+def _mock_background_and_people(run_id: str) -> list[ReconResult]:
+    """Fabricated results in the shape of the Wikidata, SEC EDGAR, leadership-page and social
+    sources, so demos and README screenshots show every category without researching a real
+    organization. The company, people, and identifiers below do not exist."""
+    web, people, docs = ResultCategory.WEB_PRESENCE, ResultCategory.PEOPLE, ResultCategory.DOCUMENTS
+    results = [
+        _mock(
+            run_id, web, "Company background: Example Demo Corp",
+            "Founded: 2012-04\nHeadquarters: Springfield\nCountry: United States\n"
+            "Industry: Software, Information security\nEmployees: 1,250 (as of 2025-12-31)\n"
+            "Revenue: $310.0 million (as of 2025)\nStock listing: Example Exchange: EXDC",
+            "company-profile:wikidata:demo", "Wikidata (mock)", 0.85,
+            "Fabricated demo data in the shape of structured Wikidata statements.",
+        ),
+        _mock(
+            run_id, web, "SEC registrant profile: Example Demo Corp, Inc.",
+            "Registered name: Example Demo Corp, Inc.\nIndustry (SIC 7372): Services-Prepackaged Software\n"
+            "State of incorporation: DE\nListed as: Example Exchange: EXDC\nFiscal year ends: 12/31 (MM/DD)",
+            "company-profile:sec:demo", "SEC EDGAR (mock)", 1.0,
+            "Fabricated demo data in the shape of an SEC EDGAR registrant profile.",
+        ),
+        _mock(
+            run_id, web, "Official LinkedIn account: example-demo-corp",
+            "LinkedIn account linked from the organization's own homepage. (Demo data.)",
+            "social:linkedin:example-demo-corp", "Demo/Mock Data", 0.9,
+        ),
+        _mock(
+            run_id, web, "Official GitHub account: example-demo-corp",
+            "GitHub account linked from the organization's own homepage. (Demo data.)",
+            "social:github:example-demo-corp", "Demo/Mock Data", 0.9,
+        ),
+        _mock(
+            run_id, docs, "Annual report (10-K) — filed 2026-02-20",
+            "SEC filing (fabricated demo accession number).",
+            "sec-filing:demo-10k", "SEC EDGAR (mock)", 1.0,
+            "Fabricated demo data in the shape of an SEC EDGAR filing link.",
+        ),
+        _mock(
+            run_id, docs, "Published security contact for example.com", "security@example.com",
+            "security-contact:example.com:security@example.com", "Demo/Mock Data", 1.0,
+            "Organization-published Contact field in /.well-known/security.txt. (Demo data.)",
+        ),
+    ]
+    for name, role, source, confidence in (
+        ("Jordan Reyes", "Chief Executive Officer", "SEC EDGAR (mock)", 0.95),
+        ("Priya Shah", "Chief Financial Officer", "SEC EDGAR (mock)", 0.95),
+        ("Alex Morgan", "Chief Information Security Officer", "Official Leadership Pages (mock)", 0.85),
+        ("Sam Lee", "Vice President, Engineering", "Official Leadership Pages (mock)", 0.7),
+        ("Taylor Brooks", "Director", "SEC EDGAR (mock)", 0.95),
+    ):
+        results.append(
+            _mock(
+                run_id, people, f"{name} — {role}",
+                f"Professional role: {role}. Fabricated person for demo purposes.",
+                f"person:demo:{name.lower()}", source, confidence,
+                "Fabricated demo data; name and title only, never personal contact details.",
+            )
+        )
+    return results
 
 
 def main() -> None:

@@ -4,6 +4,18 @@ Authorization-aware, passive-reconnaissance research tool. See [PROGRAM_REQUIREM
 
 This build targets the **lightweight MVP stack**: FastAPI + SQLAlchemy + SQLite, server-rendered Jinja2 + HTMX (progressive enhancement only — every core flow works with plain HTML forms), and a small bounded in-process job queue standing in for Celery/RQ + Redis. See [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md) and [docs/SOURCE_POLICY.md](docs/SOURCE_POLICY.md) for the security/safety design.
 
+## Screenshots
+
+All screenshots use the built-in demo organization (`python -m app.seed`): a fictional company on the reserved `example.com` domain with fabricated, clearly labeled mock results — no real organization or person.
+
+| Search | Overview with company background |
+| --- | --- |
+| ![Search page with the two access modes](docs/screenshots/search.jpg) | ![Run overview showing the company background and SEC registrant profile](docs/screenshots/overview.jpg) |
+
+| People & Organization | Changes between runs |
+| --- | --- |
+| ![People category with names, titles, sources, and confidence](docs/screenshots/people.jpg) | ![Changes view comparing two saved runs](docs/screenshots/changes.jpg) |
+
 ## What it actually does
 
 Real, keyless, ToS-friendly passive sources — no scraping of general-purpose search engines, no active scanning:
